@@ -26,42 +26,42 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
     DASHBOARD_PASSWORD: 'this_password_is_insecure_and_should_be_updated',
     SECRET_KEY_BASE: 'UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq',
     VAULT_ENC_KEY: 'your-encryption-key-32-chars-min',
-    
+
     // Database
     POSTGRES_HOST: 'db',
     POSTGRES_DB: 'postgres',
     POSTGRES_PORT: '5432',
-    
+
     // Supavisor
     POOLER_PROXY_PORT_TRANSACTION: '6543',
     POOLER_DEFAULT_POOL_SIZE: '20',
     POOLER_MAX_CLIENT_CONN: '100',
     POOLER_TENANT_ID: 'your-tenant-id',
     POOLER_DB_POOL_SIZE: '5',
-    
+
     // Kong
     KONG_HTTP_PORT: '8000',
     KONG_HTTPS_PORT: '8443',
-    
+
     // Analytics
     ANALYTICS_PORT: '4000',
-    
+
     // PostgREST
     PGRST_DB_SCHEMAS: 'public,storage,graphql_public',
-    
+
     // Auth
-    SITE_URL: 'http://localhost:3000',
+    SITE_URL: 'http://localhost:3001',
     ADDITIONAL_REDIRECT_URLS: '',
     JWT_EXPIRY: '3600',
     DISABLE_SIGNUP: 'false',
     API_EXTERNAL_URL: 'http://localhost:8000',
-    
+
     // Mailer
     MAILER_URLPATHS_CONFIRMATION: '/auth/v1/verify',
     MAILER_URLPATHS_INVITE: '/auth/v1/verify',
     MAILER_URLPATHS_RECOVERY: '/auth/v1/verify',
     MAILER_URLPATHS_EMAIL_CHANGE: '/auth/v1/verify',
-    
+
     // Email auth
     ENABLE_EMAIL_SIGNUP: 'true',
     ENABLE_EMAIL_AUTOCONFIRM: 'false',
@@ -72,31 +72,31 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
     SMTP_PASS: 'fake_mail_password',
     SMTP_SENDER_NAME: 'fake_sender',
     ENABLE_ANONYMOUS_USERS: 'false',
-    
+
     // Phone auth
     ENABLE_PHONE_SIGNUP: 'true',
     ENABLE_PHONE_AUTOCONFIRM: 'true',
-    
+
     // Studio
     STUDIO_DEFAULT_ORGANIZATION: 'Default Organization',
     STUDIO_DEFAULT_PROJECT: 'Default Project',
-    STUDIO_PORT: '3000',
+    STUDIO_PORT: '3001',
     SUPABASE_PUBLIC_URL: 'http://localhost:8000',
-    
+
     // ImgProxy
     IMGPROXY_ENABLE_WEBP_DETECTION: 'true',
-    
+
     // OpenAI
     OPENAI_API_KEY: '',
-    
+
     // Functions
     FUNCTIONS_VERIFY_JWT: 'false',
-    
+
     // Logs
     LOGFLARE_PUBLIC_ACCESS_TOKEN: 'your-super-secret-and-long-logflare-key-public',
     LOGFLARE_PRIVATE_ACCESS_TOKEN: 'your-super-secret-and-long-logflare-key-private',
     DOCKER_SOCKET_LOCATION: '/var/run/docker.sock',
-    
+
     // Google Cloud
     GOOGLE_PROJECT_ID: 'GOOGLE_PROJECT_ID',
     GOOGLE_PROJECT_NUMBER: 'GOOGLE_PROJECT_NUMBER'
@@ -113,8 +113,9 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
     internetConnection: boolean;
   } | null>(null)
   const [checkingSystem, setCheckingSystem] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
   const router = useRouter()
-  
+
   useEffect(() => {
     params.then(({ id }) => setProjectId(id))
   }, [params])
@@ -153,10 +154,42 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
     return result
   }
 
+  const generateStrongPassword = (length: number = 16) => {
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+    const numbers = '0123456789'
+    const special = '!@#$%^&*'
+    const allChars = uppercase + lowercase + numbers + special
+
+    let result = ''
+    // Ensure one of each required type
+    result += uppercase.charAt(Math.floor(Math.random() * uppercase.length))
+    result += lowercase.charAt(Math.floor(Math.random() * lowercase.length))
+    result += numbers.charAt(Math.floor(Math.random() * numbers.length))
+    result += special.charAt(Math.floor(Math.random() * special.length))
+
+    // Fill the rest
+    for (let i = 4; i < length; i++) {
+      result += allChars.charAt(Math.floor(Math.random() * allChars.length))
+    }
+
+    // Shuffle
+    return result.split('').sort(() => 0.5 - Math.random()).join('')
+  }
+
+  const validatePassword = (password: string) => {
+    if (password.length < 8) return 'Password must be at least 8 characters long'
+    if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter'
+    if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter'
+    if (!/[0-9]/.test(password)) return 'Password must contain at least one number'
+    if (!/[!@#$%^&*]/.test(password)) return 'Password must contain at least one special character (!@#$%^&*)'
+    return ''
+  }
+
   const handleGenerateSecrets = () => {
     const jwtSecret = generateSecureKey(64)
     const projectId = `project-${Date.now()}`
-    
+
     setEnvVars(prev => ({
       ...prev,
       POSTGRES_PASSWORD: generateSecureKey(32),
@@ -173,7 +206,7 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60) // 1 year
       }))}.${generateSecureKey(43)}`,
-      DASHBOARD_PASSWORD: generateSecureKey(16),
+      DASHBOARD_PASSWORD: generateStrongPassword(16),
       SECRET_KEY_BASE: generateSecureKey(64),
       VAULT_ENC_KEY: generateSecureKey(32),
       POOLER_TENANT_ID: projectId,
@@ -187,6 +220,10 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
       ...prev,
       [key]: value
     }))
+
+    if (key === 'DASHBOARD_PASSWORD') {
+      setPasswordError(validatePassword(value))
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -197,7 +234,7 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
   const handleSystemCheck = async () => {
     setCheckingSystem(true)
     setError('')
-    
+
     try {
       const response = await fetch('/api/system/check')
       if (response.ok) {
@@ -270,10 +307,10 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Image 
-              src="/logo.png" 
-              alt="SupaConsole" 
-              width={150} 
+            <Image
+              src="/logo.png"
+              alt="SupaConsole"
+              width={150}
               height={150}
               className="object-contain"
             />
@@ -307,7 +344,7 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
 
           <div className="bg-blue-500/10 border border-blue-500/20 text-blue-500 px-4 py-3 rounded mb-6">
             <p className="text-sm">
-              <strong>Important:</strong> The form below is pre-filled with default values from the Supabase configuration template. 
+              <strong>Important:</strong> The form below is pre-filled with default values from the Supabase configuration template.
               You MUST change the default passwords, secrets, and keys before deploying to production for security reasons.
             </p>
           </div>
@@ -320,7 +357,7 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
                 <CardDescription>
                   These are the most critical security settings. Generate new secure values for production use.
                 </CardDescription>
-                <Button 
+                <Button
                   onClick={handleGenerateSecrets}
                   variant="outline"
                   type="button"
@@ -364,7 +401,11 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
                       type="password"
                       value={envVars.DASHBOARD_PASSWORD}
                       onChange={createInputHandler('DASHBOARD_PASSWORD')}
+                      className={passwordError ? "border-red-500 focus-visible:ring-red-500" : ""}
                     />
+                    {passwordError && (
+                      <p className="text-sm text-red-500 mt-1">{passwordError}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="secret_key_base">Secret Key Base</Label>
@@ -699,9 +740,9 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex gap-4">
-                    <Button 
-                      onClick={handleSaveConfiguration} 
-                      disabled={loading}
+                    <Button
+                      onClick={handleSaveConfiguration}
+                      disabled={loading || !!passwordError}
                       variant="outline"
                     >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -709,8 +750,8 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
                       </svg>
                       {loading ? 'Saving...' : 'Save Configuration'}
                     </Button>
-                    
-                    <Button 
+
+                    <Button
                       onClick={handleSystemCheck}
                       disabled={checkingSystem}
                       variant="secondary"
@@ -720,9 +761,9 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
                       </svg>
                       {checkingSystem ? 'Checking...' : 'Check System'}
                     </Button>
-                    
-                    <Button 
-                      onClick={handleDeployProject} 
+
+                    <Button
+                      onClick={handleDeployProject}
                       disabled={deploying || !success}
                     >
                       {deploying ? (
@@ -774,7 +815,7 @@ export default function ConfigureProjectPage({ params }: ConfigureProjectPagePro
                       )}
                     </div>
                   )}
-                  
+
                   {!success && (
                     <p className="text-sm text-muted-foreground">
                       Save configuration first before deploying
